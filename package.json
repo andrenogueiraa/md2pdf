@@ -1,0 +1,24 @@
+{
+  "name": "md2pdf",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "cp src/ui/index.html public/index.html && bun --hot src/server.ts --dev",
+    "build": "bun build src/ui/index.tsx --outdir public --minify && cp src/ui/index.html public/index.html"
+  },
+  "dependencies": {
+    "marked": "^15.0.0",
+    "puppeteer": "^24.0.0",
+    "github-markdown-css": "^5.8.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "clsx": "^2.1.0",
+    "tailwind-merge": "^2.2.0",
+    "class-variance-authority": "^0.7.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}
