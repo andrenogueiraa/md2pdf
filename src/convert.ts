@@ -33,6 +33,36 @@ body {
 .markdown-body li {
   text-align: ${textAlign};
 }
+/* Override github-markdown-css table styles so tables fit the page width
+   instead of overflowing (which gets clipped/truncated when printing to PDF). */
+.markdown-body table {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+  overflow: visible;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+.markdown-body table th,
+.markdown-body table td {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  vertical-align: top;
+  text-align: left;
+}
+/* Avoid awkward row splits across page breaks. */
+.markdown-body table tr,
+.markdown-body table td,
+.markdown-body table th {
+  page-break-inside: avoid;
+}
+.markdown-body pre,
+.markdown-body code {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
 </style>
 </head>
 <body class="markdown-body">
