@@ -1,6 +1,7 @@
 import { readFileSync } from "fs";
 import { marked } from "marked";
-import puppeteer from "puppeteer";
+import chromium from "@sparticuz/chromium";
+import puppeteer from "puppeteer-core";
 
 export interface ConvertOptions {
   markdownContent: string;
@@ -71,8 +72,9 @@ ${htmlBody}
 </html>`;
 
   const browser = await puppeteer.launch({
+    args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
+    executablePath: await chromium.executablePath(),
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: "networkidle0" });
