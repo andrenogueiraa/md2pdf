@@ -1,4 +1,5 @@
-import { convertMarkdownToPdf, buildHtml, type Margins } from "./convert";
+import { handle as handlePreview } from "../api/preview";
+import { handle as handleConvert } from "../api/convert";
 import { join } from "path";
 
 const PUBLIC_DIR = join(import.meta.dir, "..", "public");
@@ -16,25 +17,6 @@ async function buildFrontend() {
   }
 }
 
-const jsonError = (message: string, status: number) =>
-  new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-
-function readOptions(formData: FormData): { format: string; margins: Margins; textAlign: "left" | "justify" } {
-  return {
-    format: (formData.get("format") as string) || "A4",
-    margins: {
-      top: Number(formData.get("marginTop")) || 20,
-      right: Number(formData.get("marginRight")) || 15,
-      bottom: Number(formData.get("marginBottom")) || 20,
-      left: Number(formData.get("marginLeft")) || 15,
-    },
-    textAlign: (formData.get("textAlign") as string) === "left" ? "left" : "justify",
-  };
-}
-
 if (isDev) {
   await buildFrontend();
   console.log("Dev mode: frontend will rebuild on each request");
@@ -45,46 +27,10 @@ Bun.serve({
   async fetch(req) {
     const url = new URL(req.url);
 
-    if (req.method === "POST" && url.pathname === "/api/convert") {
-      try {
-        const formData = await req.formData();
-        const file = formData.get("file") as File | null;
-        if (!file) return jsonError("No file provided", 400);
-
-        const markdownContent = await file.text();
-        const { format, margins, textAlign } = readOptions(formData);
-
-        const pdfBuffer = await convertMarkdownToPdf({ markdownContent, format, margins, textAlign });
-
-        const outputName = file.name.replace(/\.md$/i, "") + ".pdf";
-        return new Response(pdfBuffer, {
-          headers: {
-            "Content-Type": "application/pdf",
-            "Content-Disposition": `attachment; filename="${outputName}"`,
-          },
-        });
-      } catch (err: any) {
-        return jsonError(err.message, 500);
-      }
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/preview") {
-      try {
-        const formData = await req.formData();
-        const file = formData.get("file") as File | null;
-        if (!file) return jsonError("No file provided", 400);
-
-        const markdownContent = await file.text();
-        const { format, margins, textAlign } = readOptions(formData);
-
-        const html = await buildHtml({ markdownContent, textAlign, page: { format, margins } });
-        return new Response(html, {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
-        });
-      } catch (err: any) {
-        return jsonError(err.message, 500);
-      }
-    }
+    // The API routes are the very same web-standard handlers deployed to Vercel
+    // (api/preview.ts, api/convert.ts) — single source of truth across dev/prod.
+    if (req.method === "POST" && url.pathname === "/api/preview") return handlePreview(req);
+    if (req.method === "POST" && url.pathname === "/api/convert") return handleConvert(req);
 
     // In dev mode, rebuild JS on each page load
     if (isDev && (url.pathname === "/" || url.pathname === "/index.html")) {

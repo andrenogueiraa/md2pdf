@@ -33,8 +33,16 @@ export default function App() {
       const res = await fetch(`/api/${endpoint}`, { method: "POST", body: formData });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Request failed");
+        // The body may be JSON (our error) or plain text/HTML (e.g. a platform
+        // 404 page). Read as text first, then try JSON — never blindly parse.
+        const body = await res.text();
+        let message = body;
+        try {
+          message = JSON.parse(body).error || body;
+        } catch {
+          /* not JSON — keep the raw text */
+        }
+        throw new Error(message.trim().slice(0, 200) || `Request failed (${res.status})`);
       }
 
       if (endpoint === "convert") {

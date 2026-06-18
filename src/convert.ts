@@ -1,6 +1,5 @@
-import { readFileSync } from "fs";
 import { marked } from "marked";
-import puppeteer from "puppeteer";
+import { MARKDOWN_CSS } from "./markdown-css";
 
 export interface Margins {
   top: number;
@@ -32,16 +31,7 @@ export interface ConvertOptions {
   textAlign?: "left" | "justify";
 }
 
-const DEFAULT_MARGINS: Margins = { top: 20, right: 15, bottom: 20, left: 15 };
-
-let cachedCss: string | undefined;
-function markdownCss(): string {
-  if (cachedCss === undefined) {
-    const cssPath = require.resolve("github-markdown-css/github-markdown.css");
-    cachedCss = readFileSync(cssPath, "utf-8");
-  }
-  return cachedCss;
-}
+export const DEFAULT_MARGINS: Margins = { top: 20, right: 15, bottom: 20, left: 15 };
 
 function pageCss({ format, margins: m }: PageSpec): string {
   return `@page { size: ${format}; margin: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm; }`;
@@ -87,7 +77,6 @@ export async function buildHtml(options: BuildHtmlOptions): Promise<string> {
 
   marked.setOptions({ gfm: true, breaks: true });
   const htmlBody = await marked.parse(markdownContent);
-  const css = markdownCss();
 
   // Only the print path adds @page + the no-print bar; the PDF path stays
   // byte-identical to a plain markdown-body document.
@@ -99,7 +88,7 @@ export async function buildHtml(options: BuildHtmlOptions): Promise<string> {
 <head>
 <meta charset="utf-8">
 <style>
-${css}
+${MARKDOWN_CSS}
 body {
   box-sizing: border-box;
   margin: 0;
@@ -117,28 +106,22 @@ ${printBar}${htmlBody}
 </html>`;
 }
 
-export async function convertMarkdownToPdf(options: ConvertOptions): Promise<Buffer> {
-  const { markdownContent, margins = DEFAULT_MARGINS, format = "A4", textAlign = "justify" } = options;
-
-  const html = await buildHtml({ markdownContent, textAlign });
-
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
-  const page = await browser.newPage();
-  await page.setContent(html, { waitUntil: "networkidle0" });
-  const pdfBuffer = await page.pdf({
-    format: format as any,
-    margin: {
-      top: `${margins.top}mm`,
-      right: `${margins.right}mm`,
-      bottom: `${margins.bottom}mm`,
-      left: `${margins.left}mm`,
+/** Reads conversion options from a multipart form (shared by both API routes). */
+export function readOptions(formData: FormData): { format: string; margins: Margins; textAlign: "left" | "justify" } {
+  return {
+    format: (formData.get("format") as string) || "A4",
+    margins: {
+      top: Number(formData.get("marginTop")) || DEFAULT_MARGINS.top,
+      right: Number(formData.get("marginRight")) || DEFAULT_MARGINS.right,
+      bottom: Number(formData.get("marginBottom")) || DEFAULT_MARGINS.bottom,
+      left: Number(formData.get("marginLeft")) || DEFAULT_MARGINS.left,
     },
-    printBackground: true,
-  });
-  await browser.close();
-
-  return Buffer.from(pdfBuffer);
+    textAlign: (formData.get("textAlign") as string) === "left" ? "left" : "justify",
+  };
 }
+
+export const jsonError = (message: string, status: number): Response =>
+  new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
