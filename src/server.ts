@@ -1,4 +1,4 @@
-import { convertMarkdownToPdf } from "./convert";
+import { convertMarkdownToPdf, buildHtml, type Margins } from "./convert";
 import { join } from "path";
 
 const PUBLIC_DIR = join(import.meta.dir, "..", "public");
@@ -16,6 +16,25 @@ async function buildFrontend() {
   }
 }
 
+const jsonError = (message: string, status: number) =>
+  new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+
+function readOptions(formData: FormData): { format: string; margins: Margins; textAlign: "left" | "justify" } {
+  return {
+    format: (formData.get("format") as string) || "A4",
+    margins: {
+      top: Number(formData.get("marginTop")) || 20,
+      right: Number(formData.get("marginRight")) || 15,
+      bottom: Number(formData.get("marginBottom")) || 20,
+      left: Number(formData.get("marginLeft")) || 15,
+    },
+    textAlign: (formData.get("textAlign") as string) === "left" ? "left" : "justify",
+  };
+}
+
 if (isDev) {
   await buildFrontend();
   console.log("Dev mode: frontend will rebuild on each request");
@@ -30,28 +49,12 @@ Bun.serve({
       try {
         const formData = await req.formData();
         const file = formData.get("file") as File | null;
-        if (!file) {
-          return new Response(JSON.stringify({ error: "No file provided" }), {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
+        if (!file) return jsonError("No file provided", 400);
 
         const markdownContent = await file.text();
-        const format = (formData.get("format") as string) || "A4";
-        const top = Number(formData.get("marginTop")) || 20;
-        const right = Number(formData.get("marginRight")) || 15;
-        const bottom = Number(formData.get("marginBottom")) || 20;
-        const left = Number(formData.get("marginLeft")) || 15;
+        const { format, margins, textAlign } = readOptions(formData);
 
-        const textAlign = (formData.get("textAlign") as string) === "left" ? "left" : "justify";
-
-        const pdfBuffer = await convertMarkdownToPdf({
-          markdownContent,
-          format,
-          margins: { top, right, bottom, left },
-          textAlign,
-        });
+        const pdfBuffer = await convertMarkdownToPdf({ markdownContent, format, margins, textAlign });
 
         const outputName = file.name.replace(/\.md$/i, "") + ".pdf";
         return new Response(pdfBuffer, {
@@ -61,10 +64,25 @@ Bun.serve({
           },
         });
       } catch (err: any) {
-        return new Response(JSON.stringify({ error: err.message }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
+        return jsonError(err.message, 500);
+      }
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/preview") {
+      try {
+        const formData = await req.formData();
+        const file = formData.get("file") as File | null;
+        if (!file) return jsonError("No file provided", 400);
+
+        const markdownContent = await file.text();
+        const { format, margins, textAlign } = readOptions(formData);
+
+        const html = await buildHtml({ markdownContent, textAlign, page: { format, margins } });
+        return new Response(html, {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
         });
+      } catch (err: any) {
+        return jsonError(err.message, 500);
       }
     }
 

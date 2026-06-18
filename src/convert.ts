@@ -2,23 +2,99 @@ import { readFileSync } from "fs";
 import { marked } from "marked";
 import puppeteer from "puppeteer";
 
+export interface Margins {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+export interface PageSpec {
+  format: string;
+  margins: Margins;
+}
+
+export interface BuildHtmlOptions {
+  markdownContent: string;
+  textAlign?: "left" | "justify";
+  /**
+   * When provided, the HTML is self-paginating for browser printing: it injects
+   * an `@page` rule (size + margins) plus a no-print instructions bar. Omit it
+   * for the PDF path, where Puppeteer applies size/margins via `page.pdf()`.
+   */
+  page?: PageSpec;
+}
+
 export interface ConvertOptions {
   markdownContent: string;
-  margins?: { top: number; right: number; bottom: number; left: number };
+  margins?: Margins;
   format?: string;
   textAlign?: "left" | "justify";
 }
 
-export async function convertMarkdownToPdf(options: ConvertOptions): Promise<Buffer> {
-  const { markdownContent, margins = { top: 20, right: 15, bottom: 20, left: 15 }, format = "A4", textAlign = "justify" } = options;
+const DEFAULT_MARGINS: Margins = { top: 20, right: 15, bottom: 20, left: 15 };
+
+let cachedCss: string | undefined;
+function markdownCss(): string {
+  if (cachedCss === undefined) {
+    const cssPath = require.resolve("github-markdown-css/github-markdown.css");
+    cachedCss = readFileSync(cssPath, "utf-8");
+  }
+  return cachedCss;
+}
+
+function pageCss({ format, margins: m }: PageSpec): string {
+  return `@page { size: ${format}; margin: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm; }`;
+}
+
+const PRINT_BAR_CSS = `
+.print-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  color: #1f2328;
+  background: #fff8c5;
+  border-bottom: 1px solid #d4a72c;
+}
+.print-bar span { flex: 1; }
+.print-bar button {
+  flex: none;
+  padding: 6px 14px;
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: #1f883d;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.print-bar button:hover { background: #1a7f37; }
+@media print { .print-bar { display: none !important; } }
+`;
+
+const PRINT_BAR_HTML = `<div class="print-bar">
+  <span>Para o PDF sair igual ao "Convert", no Ctrl+P: <strong>ligue</strong> "Gráficos de plano de fundo" e <strong>desligue</strong> "Cabeçalhos e rodapés".</span>
+  <button type="button" onclick="window.print()">Imprimir / Salvar PDF</button>
+</div>`;
+
+export async function buildHtml(options: BuildHtmlOptions): Promise<string> {
+  const { markdownContent, textAlign = "justify", page } = options;
 
   marked.setOptions({ gfm: true, breaks: true });
   const htmlBody = await marked.parse(markdownContent);
+  const css = markdownCss();
 
-  const cssPath = require.resolve("github-markdown-css/github-markdown.css");
-  const css = readFileSync(cssPath, "utf-8");
+  // Only the print path adds @page + the no-print bar; the PDF path stays
+  // byte-identical to a plain markdown-body document.
+  const printStyles = page ? `${pageCss(page)}\n${PRINT_BAR_CSS}\n` : "";
+  const printBar = page ? `${PRINT_BAR_HTML}\n` : "";
 
-  const html = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -33,12 +109,18 @@ body {
 .markdown-body li {
   text-align: ${textAlign};
 }
-</style>
+${printStyles}</style>
 </head>
 <body class="markdown-body">
-${htmlBody}
+${printBar}${htmlBody}
 </body>
 </html>`;
+}
+
+export async function convertMarkdownToPdf(options: ConvertOptions): Promise<Buffer> {
+  const { markdownContent, margins = DEFAULT_MARGINS, format = "A4", textAlign = "justify" } = options;
+
+  const html = await buildHtml({ markdownContent, textAlign });
 
   const browser = await puppeteer.launch({
     headless: true,

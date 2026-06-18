@@ -1,3 +1,4 @@
 node_modules/
 *.pdf
 bun.lock
+.playwright-mcp/

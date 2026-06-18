@@ -15,7 +15,7 @@ export default function App() {
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleConvert = async () => {
+  const submit = async (endpoint: "convert" | "preview") => {
     if (!file) return;
     setLoading(true);
     setError("");
@@ -30,23 +30,33 @@ export default function App() {
       formData.append("marginLeft", String(margins.left));
       formData.append("textAlign", textAlign);
 
-      const res = await fetch("/api/convert", { method: "POST", body: formData });
+      const res = await fetch(`/api/${endpoint}`, { method: "POST", body: formData });
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Conversion failed");
+        throw new Error(data.error || "Request failed");
       }
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = file.name.replace(/\.md$/i, "") + ".pdf";
-      a.click();
-      URL.revokeObjectURL(url);
+      if (endpoint === "convert") {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = file.name.replace(/\.md$/i, "") + ".pdf";
+        a.click();
+        URL.revokeObjectURL(url);
+        setLoading(false);
+      } else {
+        // Replace the whole document with the server-rendered preview (same
+        // buildHtml as the PDF). Same URL, so F5 brings the form back.
+        const html = await res.text();
+        document.open();
+        document.write(html);
+        document.close();
+        // Intentionally no setState here: the React tree above was just wiped.
+      }
     } catch (err: any) {
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };
@@ -124,9 +134,19 @@ export default function App() {
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <Button className="w-full" onClick={handleConvert} disabled={!file || loading}>
-            {loading ? "Converting..." : "Convert"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => submit("preview")}
+              disabled={!file || loading}
+            >
+              {loading ? "..." : "Visualizar para impressão"}
+            </Button>
+            <Button className="flex-1" onClick={() => submit("convert")} disabled={!file || loading}>
+              {loading ? "Converting..." : "Convert"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
