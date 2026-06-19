@@ -1,5 +1,5 @@
 import { marked } from "marked";
-import { MARKDOWN_CSS } from "./markdown-css";
+import { MARKDOWN_CSS } from "./markdown-css.js";
 
 export interface Margins {
   top: number;

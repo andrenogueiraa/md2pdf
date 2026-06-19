@@ -1,4 +1,4 @@
-import { buildHtml, readOptions, jsonError } from "../src/convert";
+import { buildHtml, readOptions, jsonError } from "../src/convert.js";
 
 /**
  * POST /api/preview — returns the print-ready HTML (same buildHtml as the PDF)

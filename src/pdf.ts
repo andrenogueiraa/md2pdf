@@ -1,6 +1,6 @@
 import chromium from "@sparticuz/chromium";
 import puppeteer from "puppeteer-core";
-import { buildHtml, DEFAULT_MARGINS, type ConvertOptions } from "./convert";
+import { buildHtml, DEFAULT_MARGINS, type ConvertOptions } from "./convert.js";
 
 /**
  * Renders the PDF with the same `buildHtml` output the print preview uses, via a

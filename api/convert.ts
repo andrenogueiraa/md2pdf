@@ -1,5 +1,5 @@
-import { readOptions, jsonError } from "../src/convert";
-import { renderPdf } from "../src/pdf";
+import { readOptions, jsonError } from "../src/convert.js";
+import { renderPdf } from "../src/pdf.js";
 
 /**
  * POST /api/convert — renders the Markdown to a downloadable PDF via Chromium.

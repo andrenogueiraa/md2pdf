@@ -1,5 +1,5 @@
-import { handle as handlePreview } from "../api/preview";
-import { handle as handleConvert } from "../api/convert";
+import { handle as handlePreview } from "../api/preview.js";
+import { handle as handleConvert } from "../api/convert.js";
 import { join } from "path";
 
 const PUBLIC_DIR = join(import.meta.dir, "..", "public");
